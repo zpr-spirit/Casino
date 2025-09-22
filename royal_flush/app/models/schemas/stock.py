@@ -2,8 +2,12 @@
 Stock related data schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Any, Dict, Generic, TypeVar
 from enum import Enum
+from datetime import datetime, timezone
+
+# 类型定义
+T = TypeVar('T')
 
 class MarketType(str, Enum):
     """Market type enumeration"""
@@ -18,17 +22,48 @@ class AnalysisType(str, Enum):
     FUNDAMENTAL = "fundamental"
     COMPREHENSIVE = "comprehensive"
 
+class ApiResponse(BaseModel, Generic[T]):
+    """API响应的标准格式"""
+    success: bool = True
+    message: str = "操作成功"
+    data: Optional[T] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RunInfo(BaseModel):
+    """运行信息模型"""
+    run_id: str
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    status: str  # "running", "completed", "error"
+    agents: List[str] = []
+
+
 class StockAnalysisRequest(BaseModel):
     """Stock analysis request"""
     stock_code: str = Field(..., description="Stock code", example="000001")
     market: MarketType = Field(..., description="Market type", example="a_stock")
     analysis_type: AnalysisType = Field(default=AnalysisType.BASIC, description="Analysis type")
+    show_reasoning: bool = Field(True,description="whether to display reasoning")
+    start_date: str = Field(..., description="Start date", example="2024-01-01")
+    end_date: str = Field(..., description="End date", example="2024-10-01")
 
 class StockSearchRequest(BaseModel):
     """Stock search request"""
     query: str = Field(..., description="Search keyword", example="Ping An")
     market: MarketType = Field(..., description="Market type", example="a_stock")
     limit: int = Field(default=10, description="Return limit")
+
+class AgentExecutionLog(BaseModel):
+    """Agent执行日志"""
+    agent_name: str = Field(..., description="Agent名称")
+    run_id: str = Field(..., description="执行ID")
+    timestamp_start: datetime = Field(..., description="开始时间")
+    timestamp_end: datetime = Field(..., description="结束时间")
+    input_state: Optional[Dict[str, Any]] = Field(None, description="输入状态")
+    output_state: Optional[Dict[str, Any]] = Field(None, description="输出状态")
+    reasoning_details: Optional[Any] = Field(None, description="推理细节")
+    terminal_outputs: List[str] = Field(
+        default_factory=list, description="终端输出")
 
 class StockInfo(BaseModel):
     """Stock basic information"""
@@ -82,10 +117,11 @@ class StockAnalysisResult(BaseModel):
 
 class StockAnalysisResponse(BaseModel):
     """Stock analysis response"""
-    success: bool = Field(..., description="Whether request succeeded")
-    message: str = Field(..., description="Response message")
-    data: Optional[StockAnalysisResult] = Field(None, description="Analysis result")
-    timestamp: str = Field(..., description="Response timestamp")
+    run_id: str = Field(..., description="Run ID")
+    ticker: str = Field(..., description="Ticker")
+    status: str = Field(..., description="Status")
+    message: str = Field(..., description="Message")
+    submitted_at: datetime = Field(..., description="Submitted at")
 
 class StockSearchResponse(BaseModel):
     """Stock search response"""
